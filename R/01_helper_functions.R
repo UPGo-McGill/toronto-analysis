@@ -905,40 +905,56 @@ ghost_intersect_leftovers <- function(points, property_ID, host_ID, distance,
 }
 
 
-strr_FREH <- function(daily, start_date, end_date, R_cut = 90, AR_cut = 183,
-                      cores = 1) {
+strr_FREH <- function(daily, start_date, end_date, property_ID = property_ID,
+                      date = date, status = status, status_types = c("R", "A"),
+                      listing_type = listing_type,
+                      entire_home = "Entire home/apt", n_days = 365, R_cut = 90,
+                      AR_cut = 183, cores = 1) {
   
-  library(data.table)
+  .datatable.aware = TRUE
+  
+  setDT(daily)
   
   # Wrangle dates
   start_date <- as.Date(start_date, origin = "1970-01-01")
   end_date <- as.Date(end_date, origin = "1970-01-01")
   
   # Filter daily file
-  setDT(daily)
-  
-  daily <- 
-    daily[housing == TRUE & status %in% c("A", "R") & date >= start_date - 364 & 
+  daily <-
+    daily[housing == TRUE & status %in% c("A", "R") & date >= start_date - 364 &
             date <= end_date & listing_type == "Entire home/apt"]
   
   if (cores > 1) {
     cl <- parallel::makeForkCluster(cores)
-    pbapply::pblapply(start_date:end_date, function(date) {
-      daily <- daily[date >= date - 364 & date <= date]
+    pbapply::pblapply(start_date:end_date, function(date_check) {
+      daily <- daily[date >= date_check - 364 & date <= date_check]
       daily[, AR := .N, by = property_ID]
       daily[, R := sum(status == "R"), by = property_ID]
-      daily[, list(date = as.Date(date, origin = "1970-01-01"), 
+      daily[, list(date = as.Date(date_check, origin = "1970-01-01"),
                    FREH = as.logical((mean(AR) >= AR_cut) * (mean(R) >= R_cut))),
             by = property_ID]
     }) %>% rbindlist()
   } else {
-    lapply(start_date:end_date, function(date) {
-      daily <- daily[date >= date - 364 & date <= date]
+    lapply(start_date:end_date, function(date_check) {
+      daily <- daily[date >= date_check - 364 & date <= date_check]
       daily[, AR := .N, by = property_ID]
       daily[, R := sum(status == "R"), by = property_ID]
-      daily[, list(date = as.Date(date, origin = "1970-01-01"), 
+      daily[, list(date = as.Date(date_check, origin = "1970-01-01"),
                    FREH = as.logical((mean(AR) >= AR_cut) * (mean(R) >= R_cut))),
             by = property_ID]
     }) %>% rbindlist()
   }
+}
+
+gg_bbox <- function(geom, x1 = 0, x2 = 1, y1 = 0, y2 = 1) {
+  
+  bbox <- st_bbox(geom)
+  
+  matrix_x <- matrix(bbox[c(1,3)], nrow = 1) %*% matrix(
+    c(1 - x1, x1, 1 - x2, x2), nrow = 2)
+  
+  matrix_y <- matrix(bbox[c(2,4)], nrow = 1) %*% matrix(
+    c(1 - y1, y1, 1- y2, y2), nrow = 2)
+  
+  coord_sf(xlim = as.vector(matrix_x), ylim = as.vector(matrix_y))
 }
