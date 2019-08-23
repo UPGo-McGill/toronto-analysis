@@ -333,7 +333,7 @@ map <-
         legend.text = element_text(family = "Futura", size = 10),
         strip.text = element_text(family = "Futura", face = "bold", size = 12)) 
 
-ggsave("output/figure_2.pdf", plot = map, width = 8, height = 9, units = "in",
+ggsave("output/figure_3.pdf", plot = map, width = 8, height = 9, units = "in",
        useDingbats = FALSE)
 
 
